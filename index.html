@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Label Score</title>
+  <style>
+    body{font-family:system-ui;margin:24px;max-width:900px}
+    input{width:100%;padding:12px;font-size:16px}
+    button{padding:10px 14px;font-size:16px;margin-top:10px}
+    pre{background:#f6f6f6;padding:12px;border-radius:10px;overflow:auto}
+  </style>
+</head>
+<body>
+  <h1>Paste Amazon URL</h1>
+  <input id="url" placeholder="https://www.amazon.com/dp/B0XXXXXXX" />
+  <button id="go">Analyze</button>
+  <p id="status"></p>
+  <pre id="out"></pre>
+
+  <script>
+    function extractASIN(url){
+      const s = String(url || "").trim();
+      const m = s.match(/\/dp\/([A-Z0-9]{10})|\/gp\/product\/([A-Z0-9]{10})|\/product\/([A-Z0-9]{10})/i);
+      const asin = m ? (m[1]||m[2]||m[3]) : null;
+      return asin ? asin.toUpperCase() : null;
+    }
+
+    function jsonp(url){
+      return new Promise((resolve, reject) => {
+        const cb = "cb_" + Math.random().toString(36).slice(2);
+        window[cb] = (data) => { cleanup(); resolve(data); };
+        const script = document.createElement("script");
+        const timeout = setTimeout(() => { cleanup(); reject(new Error("Timeout")); }, 20000);
+        function cleanup(){
+          clearTimeout(timeout);
+          script.remove();
+          try{ delete window[cb]; } catch(e){ window[cb] = undefined; }
+        }
+        script.onerror = () => { cleanup(); reject(new Error("Script load failed")); };
+        const sep = url.includes("?") ? "&" : "?";
+        script.src = url + sep + "callback=" + cb;
+        document.body.appendChild(script);
+      });
+    }
+
+    document.getElementById("go").onclick = async () => {
+      const url = document.getElementById("url").value;
+      const asin = extractASIN(url);
+      if(!asin){
+        document.getElementById("status").textContent = "Could not find ASIN in that URL.";
+        return;
+      }
+      document.getElementById("status").textContent = "Calling backend...";
+      const ENDPOINT = "https://script.google.com/macros/s/AKfycbwWe2w-EJ3Oz1aslnKafCZj19akZWOSjUkj2m_orS08kMhk8lH8wxMv0D-soHfgvix_tw/exec";
+      try{
+        const data = await jsonp(`${ENDPOINT}?asin=${encodeURIComponent(asin)}`);
+        document.getElementById("status").textContent = "Done.";
+        document.getElementById("out").textContent = JSON.stringify(data, null, 2);
+      }catch(e){
+        document.getElementById("status").textContent = "Error: " + e.message;
+      }
+    };
+  </script>
+</body>
+</html>
