@@ -3,118 +3,410 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Label Score Report</title>
+  <title>LabelScore Report</title>
   <style>
-    body{font-family:system-ui;margin:20px;max-width:980px}
-    .card{border:1px solid #ddd;border-radius:14px;padding:16px;margin:12px 0}
-    .row{display:flex;gap:16px;flex-wrap:wrap}
-    img{max-width:240px;border-radius:12px;border:1px solid #ddd}
-    .pill{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid #ddd;margin-right:8px}
-    .big{font-size:28px;font-weight:700}
-    .muted{color:#666}
-    pre{background:#f6f6f6;padding:12px;border-radius:12px;overflow:auto}
+    :root{
+      --bg:#070a12; --card:#111829; --muted:#9aa6bf; --text:#e9eefc;
+      --line:rgba(255,255,255,.10);
+      --green:#22c55e; --yellow:#f59e0b; --red:#ef4444; --blue:#3b82f6;
+    }
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(1000px 500px at 10% 0%, rgba(59,130,246,.22), transparent),
+        radial-gradient(900px 400px at 90% 10%, rgba(34,197,94,.16), transparent),
+        linear-gradient(180deg, #070a12, #050611);
+    }
+    .wrap{max-width:1120px; margin:0 auto; padding:26px 16px 60px}
+    .header{
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:18px;
+      background:rgba(17,24,39,.80);
+      box-shadow:0 14px 60px rgba(0,0,0,.35);
+    }
+    .titleRow{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+    .logo{
+      width:46px;height:46px;border-radius:14px;
+      background:linear-gradient(135deg, rgba(59,130,246,.92), rgba(34,197,94,.85));
+      display:flex; align-items:center; justify-content:center; font-weight:900; letter-spacing:.5px;
+    }
+    h1{margin:0; font-size:24px}
+    .sub{color:var(--muted); font-size:13px; margin-top:4px}
+    .grid{display:grid; grid-template-columns: 1.2fr 1fr; gap:14px; margin-top:14px}
+    @media (max-width: 900px){ .grid{grid-template-columns:1fr} }
+
+    .card{
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:16px;
+      background:rgba(17,24,39,.72);
+      box-shadow:0 14px 60px rgba(0,0,0,.28);
+    }
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .pill{
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:7px 10px;
+      font-size:12px;
+      background:rgba(255,255,255,.05);
+    }
+    .grade{
+      font-weight:900; letter-spacing:.6px;
+      padding:7px 11px;
+      border-radius:999px;
+      border:1px solid var(--line);
+    }
+    .g{background:rgba(34,197,94,.16); border-color:rgba(34,197,94,.35)}
+    .y{background:rgba(245,158,11,.16); border-color:rgba(245,158,11,.35)}
+    .r{background:rgba(239,68,68,.16); border-color:rgba(239,68,68,.35)}
+    .muted{color:var(--muted)}
+    .prod{display:grid; grid-template-columns: 240px 1fr; gap:14px}
+    @media(max-width:700px){ .prod{grid-template-columns:1fr} }
+    .img{
+      width:100%; max-width:240px; aspect-ratio: 4/3;
+      border-radius:16px; border:1px solid var(--line);
+      object-fit:cover; background:rgba(255,255,255,.04)
+    }
+    .h2{font-size:14px; font-weight:900; margin:0 0 6px}
+    .bigCallout{
+      margin-top:10px;
+      border-radius:18px;
+      border:1px solid rgba(59,130,246,.40);
+      background:linear-gradient(135deg, rgba(59,130,246,.18), rgba(34,197,94,.10));
+      padding:14px;
+    }
+    .bigCallout b{color:#ffffff}
+    .list{margin:10px 0 0; padding-left:18px}
+    .kpiGrid{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:10px}
+    @media(max-width:900px){ .kpiGrid{grid-template-columns:1fr} }
+    .kpi{
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px;
+      background:rgba(0,0,0,.22);
+    }
+    .kpi .k{color:var(--muted); font-size:12px}
+    .kpi .v{font-size:18px; font-weight:900; margin-top:4px}
+    .tbl{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      overflow:hidden;
+      border-radius:16px;
+      border:1px solid var(--line);
+      margin-top:10px;
+    }
+    .tbl th,.tbl td{
+      padding:10px;
+      font-size:13px;
+      border-bottom:1px solid var(--line);
+      vertical-align:top;
+    }
+    .tbl th{color:#cfe0ff; text-align:left; background:rgba(255,255,255,.05)}
+    .tbl tr:last-child td{border-bottom:none}
+    .tag{
+      display:inline-block;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      font-size:12px;
+      background:rgba(255,255,255,.05);
+      margin:2px 6px 2px 0;
+    }
+    .tag.bad{border-color:rgba(239,68,68,.35); background:rgba(239,68,68,.10)}
+    .tag.mid{border-color:rgba(245,158,11,.35); background:rgba(245,158,11,.10)}
+    .tag.good{border-color:rgba(34,197,94,.35); background:rgba(34,197,94,.10)}
+    .hr{height:1px; background:var(--line); margin:12px 0}
+    .small{font-size:12px; color:var(--muted); line-height:1.35}
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="big">Label Score Report</div>
-    <div class="muted" id="status">Loading…</div>
-  </div>
-
-  <div id="main" style="display:none;">
-    <div class="card">
-      <div class="row">
+  <div class="wrap">
+    <div class="header">
+      <div class="titleRow">
+        <div class="logo">LS</div>
         <div>
-          <img id="img" alt="Best label image" />
+          <h1>LabelScore Report</h1>
+          <div class="sub">A label-first nutrition read with ingredient risk categories, serving-size reality checks, and actionable swaps.</div>
         </div>
-        <div style="flex:1;min-width:260px;">
-          <div class="big" id="verdict"></div>
-          <div><span class="pill" id="score"></span><span class="pill" id="confidence"></span></div>
-          <div style="margin-top:8px;font-weight:600;" id="title"></div>
-          <div class="muted" id="asin"></div>
-          <div style="margin-top:12px;" id="reasons"></div>
+      </div>
+      <div class="sub" id="status">Loading…</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="prod">
+          <img id="img" class="img" alt="Product image" />
+          <div>
+            <div class="row">
+              <span id="grade" class="grade">GRADE: —</span>
+              <span id="score" class="pill">Score: —</span>
+              <span id="risk" class="pill">Risk: —</span>
+              <span id="conf" class="pill">Confidence: —</span>
+            </div>
+            <div style="margin-top:10px; font-weight:900; font-size:16px" id="title">—</div>
+            <div class="muted" id="asin">—</div>
+
+            <div class="bigCallout" id="monkveeCallout" style="display:none;"></div>
+
+            <div class="hr"></div>
+            <div class="h2">Top reasons</div>
+            <ul class="list" id="reasons"></ul>
+          </div>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="h2">Serving-size reality check</div>
+        <div class="small">
+          Many products look “low sugar” because the serving size is unrealistically small.
+          This panel estimates what happens if someone eats a more typical amount for this food type.
+        </div>
+
+        <div class="kpiGrid">
+          <div class="kpi">
+            <div class="k">Serving size (label)</div>
+            <div class="v" id="servSize">—</div>
+          </div>
+          <div class="kpi">
+            <div class="k">Added sugar / serving</div>
+            <div class="v" id="addedSugar">—</div>
+          </div>
+          <div class="kpi">
+            <div class="k">Estimated “likely” intake</div>
+            <div class="v" id="likelySugar">—</div>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+        <div class="h2">Extracted nutrition</div>
+        <div id="nutritionTags"></div>
       </div>
     </div>
 
-    <div class="card">
-      <div style="font-weight:700;margin-bottom:8px;">Extracted Nutrition</div>
-      <pre id="nutrition"></pre>
+    <div class="card" style="margin-top:14px;">
+      <div class="h2">Ingredients analysis</div>
+      <div class="small">Flagged items are grouped by category (colors, oils, preservatives, flavor systems, binders, etc.).</div>
+
+      <table class="tbl" id="ingTable">
+        <thead>
+          <tr>
+            <th style="width:190px;">Category</th>
+            <th>Flagged ingredients</th>
+            <th style="width:320px;">Why it matters (plain English)</th>
+          </tr>
+        </thead>
+        <tbody id="ingRows">
+          <tr><td colspan="3" class="muted">Loading…</td></tr>
+        </tbody>
+      </table>
+
+      <div class="hr"></div>
+      <div class="h2">Tailored advice (based on food type)</div>
+      <div id="advice" class="small"></div>
     </div>
 
-    <div class="card">
-      <div style="font-weight:700;margin-bottom:8px;">Ingredients</div>
-      <pre id="ingredients"></pre>
+    <div class="card" style="margin-top:14px;">
+      <div class="h2">Raw extracted text</div>
+      <div class="small">If confidence is low, it usually means the listing doesn’t provide a readable Nutrition Facts / Ingredients image.</div>
+      <table class="tbl">
+        <tbody>
+          <tr><th>Ingredients text</th><td id="rawIngredients" class="small">—</td></tr>
+          <tr><th>OCR snippet</th><td id="rawOcr" class="small">—</td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <div class="card">
-      <div style="font-weight:700;margin-bottom:8px;">Suggestions</div>
-      <pre id="suggestions"></pre>
+    <div class="card" style="margin-top:14px;">
+      <div class="small">
+        Disclaimer: This is educational and not medical advice. If you have diabetes, kidney disease, hypertension, food allergies, or other conditions, use your clinician’s individualized guidance.
+      </div>
     </div>
   </div>
 
-  <script>
-    // paste your Apps Script Web App URL here:
-    const API = "https://script.google.com/macros/s/AKfycbwWe2w-EJ3Oz1aslnKafCZj19akZWOSjUkj2m_orS08kMhk8lH8wxMv0D-soHfgvix_tw/exec";
+<script>
+  // IMPORTANT: Set this to your Apps Script /exec URL
+  const API = "https://script.google.com/macros/s/AKfycbwWe2w-EJ3Oz1aslnKafCZj19akZWOSjUkj2m_orS08kMhk8lH8wxMv0D-soHfgvix_tw/exec"; // .../exec
 
-    function getParam(name){
-      const u = new URL(location.href);
-      return u.searchParams.get(name);
+  const $ = (id) => document.getElementById(id);
+
+  function qs(key){
+    const u = new URL(location.href);
+    return u.searchParams.get(key) || "";
+  }
+
+  function gradeFromScore(score){
+    if (score == null || isNaN(score)) return { grade:"—", band:"y", risk:"Unknown" };
+    if (score >= 90) return { grade:"A", band:"g", risk:"Low" };
+    if (score >= 80) return { grade:"B", band:"g", risk:"Low" };
+    if (score >= 75) return { grade:"C+", band:"g", risk:"Low–Moderate" };
+    if (score >= 65) return { grade:"C", band:"y", risk:"Moderate" };
+    if (score >= 55) return { grade:"C-", band:"y", risk:"Moderate–High" };
+    if (score >= 45) return { grade:"D", band:"r", risk:"High" };
+    return { grade:"F", band:"r", risk:"Very High" };
+  }
+
+  function applyBand(el, band){
+    el.classList.remove("g","y","r");
+    el.classList.add(band);
+  }
+
+  function fmt(x, unit=""){
+    if (x == null || x === "" || Number.isNaN(x)) return "—";
+    return `${x}${unit}`;
+  }
+
+  function classifyFoodType(title=""){
+    const t = title.toLowerCase();
+    const rules = [
+      ["candy", ["candy","licorice","gummy","twizzlers","chocolate","sour","skittles","m&ms"]],
+      ["sugary beverage", ["soda","cola","juice","lemonade","sweet tea","energy drink","sports drink"]],
+      ["cereal", ["cereal","granola","flakes","oats"]],
+      ["snack chips", ["chips","crisps","doritos","tortilla chips","pretzels"]],
+      ["protein bar", ["protein bar","bar","clif","rxbar"]],
+      ["yogurt/dairy", ["yogurt","kefir","ice cream","milkshake"]],
+      ["condiment/sauce", ["ketchup","sauce","bbq","dressing","mayo"]],
+      ["bread/bakery", ["bread","bun","bagel","cookies","cake","muffin"]],
+      ["frozen meal", ["frozen","microwave","dinner","lasagna","pizza"]],
+      ["nuts/seed snack", ["nuts","almonds","trail mix","seed"]],
+    ];
+    for (const [type, kws] of rules){
+      if (kws.some(k => t.includes(k))) return type;
+    }
+    return "packaged food";
+  }
+
+  function likelyServingMultiplier(foodType){
+    // heuristic only; keeps “reality check” honest and useful
+    if (foodType === "candy") return 2.5;
+    if (foodType === "sugary beverage") return 1.0;
+    if (foodType === "cereal") return 2.0;
+    if (foodType === "snack chips") return 2.0;
+    if (foodType === "protein bar") return 1.0;
+    if (foodType === "yogurt/dairy") return 1.0;
+    if (foodType === "bread/bakery") return 2.0;
+    if (foodType === "condiment/sauce") return 2.0;
+    if (foodType === "frozen meal") return 1.0;
+    return 1.5;
+  }
+
+  function makeTag(text, kind="mid"){
+    const s = document.createElement("span");
+    s.className = `tag ${kind}`;
+    s.textContent = text;
+    return s;
+  }
+
+  function render(){
+    const rid = qs("rid");
+    if (!rid){
+      $("status").textContent = "Missing rid. Open this from the extension.";
+      return;
     }
 
-    function jsonp(url){
-      return new Promise((resolve, reject) => {
-        const cb = "cb_" + Math.random().toString(36).slice(2);
-        window[cb] = (data) => { cleanup(); resolve(data); };
-        const s = document.createElement("script");
-        const t = setTimeout(() => { cleanup(); reject(new Error("Timeout")); }, 20000);
-        function cleanup(){
-          clearTimeout(t);
-          s.remove();
-          try{ delete window[cb]; } catch(e){ window[cb] = undefined; }
+    $("status").textContent = "Loading…";
+
+    fetch(`${API}?action=get&rid=${encodeURIComponent(rid)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (!data.ok) throw new Error(data.error || "Failed to load report");
+
+        $("status").textContent = "Loaded.";
+        $("title").textContent = data.title || "—";
+        $("asin").textContent = `ASIN: ${data.asin || "—"}`;
+        $("img").src = data.bestImageUrl || "";
+
+        const g = gradeFromScore(data.score);
+        $("grade").textContent = `GRADE: ${g.grade}`;
+        applyBand($("grade"), g.band);
+        $("score").textContent = `Score: ${data.score == null ? "—" : data.score}`;
+        $("risk").textContent = `Risk: ${g.risk}`;
+        $("conf").textContent = `Confidence: ${data.confidence || "—"}`;
+
+        // reasons
+        const reasons = $("reasons");
+        reasons.innerHTML = "";
+        (data.topReasons || []).slice(0, 6).forEach(r => {
+          const li = document.createElement("li");
+          li.textContent = r;
+          reasons.appendChild(li);
+        });
+
+        // nutrition tags
+        const nt = $("nutritionTags");
+        nt.innerHTML = "";
+        const n = data.nutrition || {};
+        nt.appendChild(makeTag(`Calories: ${fmt(n.calories)}`, "mid"));
+        nt.appendChild(makeTag(`Added sugar: ${fmt(n.addedSugarG,"g")}`, (n.addedSugarG >= 12 ? "bad" : n.addedSugarG >= 6 ? "mid" : "good")));
+        nt.appendChild(makeTag(`Total sugar: ${fmt(n.totalSugarG,"g")}`, "mid"));
+        nt.appendChild(makeTag(`Fiber: ${fmt(n.fiberG,"g")}`, (n.fiberG >= 5 ? "good" : "mid")));
+        nt.appendChild(makeTag(`Protein: ${fmt(n.proteinG,"g")}`, (n.proteinG >= 10 ? "good" : "mid")));
+        nt.appendChild(makeTag(`Sodium: ${fmt(n.sodiumMg,"mg")}`, (n.sodiumMg >= 500 ? "bad" : n.sodiumMg >= 250 ? "mid" : "good")));
+        nt.appendChild(makeTag(`Sat fat: ${fmt(n.satFatG,"g")}`, (n.satFatG >= 5 ? "bad" : "mid")));
+
+        // serving-size reality check
+        const foodType = classifyFoodType(data.title || "");
+        const mult = likelyServingMultiplier(foodType);
+        $("servSize").textContent = n.servingSize || "—";
+        $("addedSugar").textContent = (n.addedSugarG == null ? "—" : `${n.addedSugarG}g`);
+        const likely = (n.addedSugarG == null ? null : Math.round(n.addedSugarG * mult * 10) / 10);
+        $("likelySugar").textContent = (likely == null ? "—" : `${likely}g (est. ~${mult} servings for ${foodType})`);
+
+        // MonkVee callout
+        const mv = $("monkveeCallout");
+        mv.style.display = "none";
+        if (data.monkvee && data.monkvee.show){
+          mv.style.display = "block";
+          mv.innerHTML =
+            `<b>MonkVee swap suggestion:</b> ${data.monkvee.message}`;
         }
-        s.onerror = () => { cleanup(); reject(new Error("Load failed")); };
-        const sep = url.includes("?") ? "&" : "?";
-        s.src = url + sep + "callback=" + cb;
-        document.body.appendChild(s);
+
+        // ingredients analysis table
+        const rows = $("ingRows");
+        rows.innerHTML = "";
+
+        const cats = data.ingredientFindings || [];
+        if (!cats.length){
+          rows.innerHTML = `<tr><td colspan="3" class="muted">No categorized ingredient flags detected (or ingredients not readable).</td></tr>`;
+        } else {
+          cats.forEach(cat => {
+            const tr = document.createElement("tr");
+            const td1 = document.createElement("td");
+            const td2 = document.createElement("td");
+            const td3 = document.createElement("td");
+
+            td1.innerHTML = `<b>${cat.category}</b><div class="small">${cat.severityLabel}</div>`;
+
+            td2.innerHTML = (cat.matches || []).map(m => {
+              const kind = cat.severity === "high" ? "bad" : cat.severity === "medium" ? "mid" : "good";
+              return `<span class="tag ${kind}">${m}</span>`;
+            }).join(" ");
+
+            td3.className = "small";
+            td3.textContent = cat.why || "";
+
+            tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+            rows.appendChild(tr);
+          });
+        }
+
+        // tailored advice
+        $("advice").textContent = (data.tailoredAdvice || "—");
+
+        // raw text
+        $("rawIngredients").textContent = (data.ingredientsText || "—");
+        $("rawOcr").textContent = (data.ocrSnippet || "—");
+
+      })
+      .catch(err => {
+        $("status").textContent = "Error: " + err.message;
       });
-    }
+  }
 
-    function esc(s){ return String(s||""); }
-
-    (async function(){
-      const rid = getParam("rid");
-      if(!rid){
-        document.getElementById("status").textContent = "Missing rid. Open this from the extension.";
-        return;
-      }
-      try{
-        const data = await jsonp(`${API}?action=get&rid=${encodeURIComponent(rid)}`);
-        if(!data.ok){
-          document.getElementById("status").textContent = "Error: " + esc(data.error);
-          return;
-        }
-        document.getElementById("status").textContent = "Loaded.";
-        document.getElementById("main").style.display = "block";
-
-        document.getElementById("img").src = data.bestImageUrl || "";
-        document.getElementById("verdict").textContent = esc(data.verdict || "");
-        document.getElementById("score").textContent = "Score: " + esc(data.score);
-        document.getElementById("confidence").textContent = "Confidence: " + esc(data.confidence);
-        document.getElementById("title").textContent = esc(data.title || "");
-        document.getElementById("asin").textContent = data.asin ? ("ASIN: " + data.asin) : "";
-
-        const reasons = (data.topReasons || []).map(r => "• " + r).join("\n");
-        document.getElementById("reasons").innerHTML = "<pre>"+esc(reasons)+"</pre>";
-
-        document.getElementById("nutrition").textContent = JSON.stringify(data.extracted || {}, null, 2);
-        document.getElementById("ingredients").textContent = esc((data.extracted && data.extracted.ingredientsText) || "");
-        document.getElementById("suggestions").textContent = (data.suggestions || []).join("\n") || "None";
-
-      } catch(e){
-        document.getElementById("status").textContent = "Error: " + e.message;
-      }
-    })();
-  </script>
+  render();
+</script>
 </body>
 </html>
