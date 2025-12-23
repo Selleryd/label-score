@@ -1,4 +1,4 @@
-// app.js - LabelScore GitHub Report UI (matches index.html IDs)
+// app.js - LabelScore GitHub Report UI (patched: robust flags/advice rendering + flexible IDs)
 "use strict";
 
 const WEBAPP =
@@ -8,7 +8,11 @@ const $ = (id) => document.getElementById(id);
 
 function escapeHtml(s) {
   return String(s || "").replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
   }[c]));
 }
 
@@ -111,6 +115,111 @@ function pick(obj, keys) {
   return null;
 }
 
+/** Find first existing element by trying multiple IDs */
+function firstEl(ids) {
+  for (const id of ids) {
+    const el = $(id);
+    if (el) return el;
+  }
+  return null;
+}
+
+/** Normalize flags to an array of display strings */
+function normalizeFlags(d, v) {
+  const candidates =
+    (Array.isArray(d.flags) && d.flags) ||
+    (Array.isArray(d.warnings) && d.warnings) ||
+    (Array.isArray(d.ingredientFlags) && d.ingredientFlags) ||
+    (Array.isArray(d.ingredient_flags) && d.ingredient_flags) ||
+    (Array.isArray(d.flaggedIngredients) && d.flaggedIngredients) ||
+    (Array.isArray(v.flags) && v.flags) ||
+    (Array.isArray(v.warnings) && v.warnings) ||
+    [];
+
+  return candidates
+    .filter(Boolean)
+    .map((f) => {
+      if (typeof f === "string") return f.trim();
+      if (typeof f === "object") {
+        // support {name, reason} / {ingredient, issue} / etc.
+        const a = f.name || f.ingredient || f.item || f.flag || "";
+        const b = f.reason || f.issue || f.note || "";
+        return b ? `${String(a).trim()}: ${String(b).trim()}` : String(a).trim();
+      }
+      return String(f).trim();
+    })
+    .filter(Boolean);
+}
+
+/** Normalize advice to array of strings (or null) */
+function normalizeAdvice(d, v) {
+  const raw =
+    d.tailoredAdvice ??
+    d.tailored_advice ??
+    d.advice ??
+    d.recommendations ??
+    d.recs ??
+    d.summary ??
+    d.notes ??
+    v.tailoredAdvice ??
+    v.advice ??
+    v.recommendations ??
+    null;
+
+  if (Array.isArray(raw)) {
+    return raw.map((x) => (typeof x === "string" ? x.trim() : JSON.stringify(x))).filter(Boolean);
+  }
+
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return [];
+    // allow newline-separated advice
+    if (s.includes("\n")) return s.split("\n").map((x) => x.trim()).filter(Boolean);
+    return [s];
+  }
+
+  return [];
+}
+
+function renderFlagsInto(el, flags) {
+  if (!el) return;
+  el.innerHTML = "";
+
+  if (!flags.length) {
+    // keep empty rather than “—” spam; you can change to placeholder if you want
+    // el.innerHTML = `<div class="muted">No ingredient flags.</div>`;
+    return;
+  }
+
+  flags.slice(0, 20).forEach((f) => {
+    const chip = document.createElement("span");
+    chip.className = "flag";
+    chip.textContent = String(f);
+    el.appendChild(chip);
+  });
+}
+
+function renderAdviceInto(el, adviceArr) {
+  if (!el) return;
+  el.innerHTML = "";
+
+  if (!adviceArr.length) {
+    // el.innerHTML = `<div class="muted">No tailored advice.</div>`;
+    return;
+  }
+
+  // Render as bullet list
+  const ul = document.createElement("ul");
+  ul.className = "adviceList";
+  adviceArr.slice(0, 20).forEach((a) => {
+    const li = document.createElement("li");
+    li.className = "adviceItem";
+    li.textContent = a;
+    ul.appendChild(li);
+  });
+  el.appendChild(ul);
+}
+
 function hydrateReport(data) {
   const d = data.data || data;
 
@@ -190,19 +299,15 @@ function hydrateReport(data) {
     [];
   renderCallouts(callouts, "callouts");
 
-  // Flags / advice (optional)
-  const flagsEl = $("flags");
-  if (flagsEl) {
-    const flags = Array.isArray(d.flags) ? d.flags : (Array.isArray(d.warnings) ? d.warnings : []);
-    flagsEl.innerHTML = "";
-    flags.slice(0, 12).forEach((f) => {
-      const chip = document.createElement("span");
-      chip.className = "flag";
-      chip.textContent = String(f);
-      flagsEl.appendChild(chip);
-    });
-  }
-  setText("advice", d.advice || d.summary || d.notes || "", "");
+  // ✅ Ingredient flags (patched: supports multiple IDs + multiple field names)
+  const flagsMount = firstEl(["flags", "ingredientFlags", "ingredient_flags", "flagList", "ingredientFlagList"]);
+  const flags = normalizeFlags(d, v);
+  renderFlagsInto(flagsMount, flags);
+
+  // ✅ Tailored advice (patched: supports multiple IDs + array/string)
+  const adviceMount = firstEl(["advice", "tailoredAdvice", "tailored_advice", "adviceText", "adviceBox"]);
+  const adviceArr = normalizeAdvice(d, v);
+  renderAdviceInto(adviceMount, adviceArr);
 
   // AI box (optional)
   const aiBox = $("aiBox");
@@ -226,7 +331,6 @@ function hydrateReport(data) {
   const servNote = $("servNote");
 
   if (slider && servVal) {
-    // Set max based on servings per container if we have it
     const spc = numOrNull(servingsPerContainer);
     if (spc && spc > 1) slider.max = String(Math.min(20, Math.ceil(spc)));
     else slider.max = slider.max || "6";
