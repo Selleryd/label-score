@@ -1,5 +1,8 @@
-// app.js — LabelScore GitHub Report UI (robust: timeout + CORS-safe errors)
-const WEBAPP = "https://script.google.com/macros/s/AKfycbwWe2w-EJ3Oz1aslnKafCZj19akZWOSjUkj2m_orS08kMhk8lH8wxMv0D-soHfgvix_tw/exec";
+// app.js - LabelScore GitHub Report UI (matches index.html IDs)
+"use strict";
+
+const WEBAPP =
+  "https://script.google.com/macros/s/AKfycbwWe2w-EJ3Oz1aslnKafCZj19akZWOSjUkj2m_orS08kMhk8lH8wxMv0D-soHfgvix_tw/exec";
 
 const $ = (id) => document.getElementById(id);
 
@@ -9,43 +12,21 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function setText(id, txt) {
+function setText(id, txt, fallback = "—") {
   const el = $(id);
   if (!el) return;
-  el.textContent = (txt === undefined || txt === null || txt === "") ? "—" : String(txt);
+  const v = (txt === undefined || txt === null || txt === "") ? fallback : String(txt);
+  el.textContent = v;
 }
 
-// Tries a bunch of common loading indicator IDs so your UI will actually stop “Loading…”
-function setLoadingUI(isLoading, msg) {
-  const text = msg || (isLoading ? "Loading…" : "");
-  ["loadState", "loadingText", "statusText", "pageStatus", "topStatus"].forEach((id) => {
-    const el = $(id);
-    if (el) el.textContent = text;
-  });
-
-  // If your page uses a literal "Loading..." element without an id, this will still help:
-  const loadingNodes = document.querySelectorAll("[data-loading]");
-  loadingNodes.forEach(n => n.textContent = text);
-
-  document.documentElement.classList.toggle("is-loading", !!isLoading);
+function setStatus(txt) {
+  setText("status", txt, "");
 }
 
-function gradeFromScore(score) {
-  const s = Number(score);
-  if (!isFinite(s)) return "—";
-  if (s >= 90) return "A";
-  if (s >= 80) return "B";
-  if (s >= 70) return "C";
-  if (s >= 60) return "D";
-  return "F";
-}
-
-function riskFromVerdict(verdict) {
-  const v = String(verdict || "").toUpperCase();
-  if (v === "GOOD") return "Low";
-  if (v === "MIDDLE") return "Medium";
-  if (v === "BAD") return "High";
-  return "Unknown";
+function setPill(id, txt) {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = txt || "—";
 }
 
 function renderCallouts(list, mountId) {
@@ -56,7 +37,7 @@ function renderCallouts(list, mountId) {
   const arr = Array.isArray(list) ? list : [];
   if (!arr.length) return;
 
-  arr.slice(0, 10).forEach((c) => {
+  arr.slice(0, 12).forEach((c) => {
     const tone = String(c.tone || c.severity || "note").toLowerCase();
     const title = c.title || c.category || "Note";
     const body = c.body || c.why || c.text || "";
@@ -94,7 +75,6 @@ function getRidFromUrl() {
 
   const hash = String(window.location.hash || "").replace(/^#/, "");
   if (!hash) return "";
-
   const hs = new URLSearchParams(hash);
   rid = hs.get("rid") || hs.get("RID") || hs.get("id") || "";
   if (rid) return rid.trim();
@@ -106,99 +86,196 @@ function getRidFromUrl() {
 async function fetchJsonWithTimeout(url, ms = 20000) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), ms);
-
   try {
     const res = await fetch(url, { method: "GET", signal: controller.signal });
     const txt = await res.text();
-
-    // If Apps Script returns HTML (error page), show it clearly
     let json = null;
     try { json = JSON.parse(txt); } catch (_) {}
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}: ${json?.error || txt.slice(0, 200)}`);
-    }
-    if (!json) throw new Error("Backend did not return JSON. (Often CORS / wrong URL / not deployed)");
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${json?.error || txt.slice(0, 200)}`);
+    if (!json) throw new Error("Backend did not return JSON.");
     return json;
   } finally {
     clearTimeout(t);
   }
 }
 
-function renderKnownIds(data) {
-  // Works if your HTML has these IDs; otherwise harmless.
-  setText("scoreVal", data.score);
-  setText("confidenceVal", data.confidence);
-  setText("verdictVal", String(data.verdict || "").toUpperCase());
-  setText("riskVal", riskFromVerdict(data.verdict));
-
-  const grade = gradeFromScore(data.score);
-  setText("gradeVal", grade);
-
-  // Nutrition support multiple shapes
-  const v = data.virtualLabel || data.nutrition || data.extracted || {};
-  const calories = v.calories ?? data.calories ?? null;
-  const addedSugar = v.addedSugarG ?? v.addedSugar ?? data.addedSugarG ?? data.addedSugar ?? null;
-  const sodium = v.sodiumMg ?? v.sodium ?? data.sodiumMg ?? data.sodium ?? null;
-  const serving = v.servingSize ?? data.servingSize ?? null;
-
-  setText("caloriesVal", calories);
-  setText("addedSugarVal", addedSugar == null ? "—" : `${addedSugar}g`);
-  setText("sodiumVal", sodium == null ? "—" : `${sodium}mg`);
-  setText("servingSizeVal", serving);
-
-  const ingredientsExact =
-    data.ingredients_exact ||
-    data.ingredientsText ||
-    data.ingredients ||
-    (data.extracted && data.extracted.ingredientsText) ||
-    "";
-
-  setText("ingredientsVal", ingredientsExact);
-
-  const callouts =
-    (Array.isArray(data.aiCallouts) && data.aiCallouts.length) ? data.aiCallouts :
-    (Array.isArray(data.callouts) && data.callouts.length) ? data.callouts :
-    (Array.isArray(data.topReasons) && data.topReasons.length)
-      ? data.topReasons.map(t => ({ tone: "note", title: "Note", body: t }))
-      : [];
-
-  renderCallouts(callouts, "callouts");
+function numOrNull(v) {
+  const n = Number(String(v ?? "").replace(/[^\d.]/g, ""));
+  return Number.isFinite(n) ? n : null;
 }
 
-async function loadReport(rid) {
-  setLoadingUI(true, "Loading…");
+function pick(obj, keys) {
+  for (const k of keys) {
+    if (obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== "") return obj[k];
+  }
+  return null;
+}
 
-  const url = `${WEBAPP}?action=get&rid=${encodeURIComponent(rid)}`;
-  const json = await fetchJsonWithTimeout(url, 20000);
+function hydrateReport(data) {
+  const d = data.data || data;
 
-  if (!json.ok) throw new Error(json.error || "Backend error.");
+  // Header pills
+  const verdict = String(d.verdict || "").toUpperCase() || "—";
+  setPill("pillVerdict", verdict);
+  setPill("pillScore", `Score: ${d.score ?? "—"}`);
+  setPill("pillConf", `Confidence: ${d.confidence ?? "—"}`);
 
-  // some backends put payload at json.data; support both
-  const data = json.data || json;
+  // Product
+  setText("prodTitle", d.title || d.productTitle || d.name || "—");
+  setText("asin", d.asin || "—");
+  const img = d.imageUrl || d.image || pick(d, ["primaryImage", "img"]);
+  const imgEl = $("prodImg");
+  if (imgEl) {
+    if (img) {
+      imgEl.src = img;
+      imgEl.classList.remove("hidden");
+    } else {
+      imgEl.classList.add("hidden");
+    }
+  }
 
-  renderKnownIds(data);
+  // Nutrition (support multiple shapes)
+  const v = d.virtualLabel || d.nutrition || d.extracted || d.nutritionFacts || {};
 
-  setLoadingUI(false, "");
+  const servingsPerContainer =
+    pick(v, ["servingsPerContainer", "servings_per_container", "servings"]) ??
+    pick(d, ["servingsPerContainer", "servings_per_container", "servings"]);
+
+  const servingSize =
+    pick(v, ["servingSize", "serving_size"]) ??
+    pick(d, ["servingSize", "serving_size"]);
+
+  const calories =
+    pick(v, ["calories", "kcal"]) ??
+    pick(d, ["calories", "kcal"]);
+
+  const fat = pick(v, ["totalFatG", "fatG", "totalFat"]) ?? pick(d, ["totalFatG", "fatG", "totalFat"]);
+  const sat = pick(v, ["satFatG", "saturatedFatG", "satFat"]) ?? pick(d, ["satFatG", "saturatedFatG", "satFat"]);
+  const trans = pick(v, ["transFatG", "transFat"]) ?? pick(d, ["transFatG", "transFat"]);
+  const sodium = pick(v, ["sodiumMg", "sodium_mg", "sodium"]) ?? pick(d, ["sodiumMg", "sodium_mg", "sodium"]);
+  const carb = pick(v, ["totalCarbG", "carbG", "totalCarb"]) ?? pick(d, ["totalCarbG", "carbG", "totalCarb"]);
+  const fiber = pick(v, ["fiberG", "dietaryFiberG", "fiber"]) ?? pick(d, ["fiberG", "dietaryFiberG", "fiber"]);
+  const sugar = pick(v, ["totalSugarG", "sugarsG", "totalSugars"]) ?? pick(d, ["totalSugarG", "sugarsG", "totalSugars"]);
+  const added = pick(v, ["addedSugarG", "addedSugarsG", "addedSugar"]) ?? pick(d, ["addedSugarG", "addedSugarsG", "addedSugar"]);
+  const protein = pick(v, ["proteinG", "protein"]) ?? pick(d, ["proteinG", "protein"]);
+
+  setText("nfServings", servingsPerContainer);
+  setText("nfServingSize", servingSize);
+  setText("nfCalories", calories);
+  setText("nfFat", fat);
+  setText("nfSat", sat);
+  setText("nfTrans", trans);
+  setText("nfSodium", sodium);
+  setText("nfCarb", carb);
+  setText("nfFiber", fiber);
+  setText("nfSugar", sugar);
+  setText("nfAdded", added);
+  setText("nfProtein", protein);
+
+  // Ingredients
+  const ing =
+    d.ingredients_exact ||
+    d.ingredientsText ||
+    d.ingredients ||
+    v.ingredientsText ||
+    v.ingredients ||
+    "—";
+  setText("ingText", ing);
+
+  // Callouts
+  const callouts =
+    (Array.isArray(d.callouts) && d.callouts.length) ? d.callouts :
+    (Array.isArray(d.aiCallouts) && d.aiCallouts.length) ? d.aiCallouts :
+    (Array.isArray(d.topReasons) && d.topReasons.length) ? d.topReasons.map(t => ({ tone: "info", title: "Info", body: t })) :
+    [];
+  renderCallouts(callouts, "callouts");
+
+  // Flags / advice (optional)
+  const flagsEl = $("flags");
+  if (flagsEl) {
+    const flags = Array.isArray(d.flags) ? d.flags : (Array.isArray(d.warnings) ? d.warnings : []);
+    flagsEl.innerHTML = "";
+    flags.slice(0, 12).forEach((f) => {
+      const chip = document.createElement("span");
+      chip.className = "flag";
+      chip.textContent = String(f);
+      flagsEl.appendChild(chip);
+    });
+  }
+  setText("advice", d.advice || d.summary || d.notes || "", "");
+
+  // AI box (optional)
+  const aiBox = $("aiBox");
+  const aiCallouts = Array.isArray(d.aiCallouts) ? d.aiCallouts : [];
+  if (aiBox) {
+    if (aiCallouts.length) {
+      aiBox.classList.remove("hidden");
+      renderCallouts(aiCallouts, "aiCallouts");
+    } else {
+      aiBox.classList.add("hidden");
+    }
+  }
+
+  // Reality check slider totals
+  const baseCal = numOrNull(calories);
+  const baseAdded = numOrNull(added);
+  const baseSodium = numOrNull(sodium);
+
+  const slider = $("servSlider");
+  const servVal = $("servVal");
+  const servNote = $("servNote");
+
+  if (slider && servVal) {
+    // Set max based on servings per container if we have it
+    const spc = numOrNull(servingsPerContainer);
+    if (spc && spc > 1) slider.max = String(Math.min(20, Math.ceil(spc)));
+    else slider.max = slider.max || "6";
+
+    const update = () => {
+      const n = Number(slider.value || 1);
+      servVal.textContent = String(n);
+
+      if (baseCal != null) setText("tCal", Math.round(baseCal * n));
+      else setText("tCal", "—");
+
+      if (baseAdded != null) setText("tSugar", `${(baseAdded * n).toFixed(baseAdded % 1 ? 1 : 0)} g`);
+      else setText("tSugar", "—");
+
+      if (baseSodium != null) setText("tSodium", `${Math.round(baseSodium * n)} mg`);
+      else setText("tSodium", "—");
+
+      if (servNote) {
+        if (spc && n > spc) servNote.textContent = `You selected ${n} servings (label says ${spc} per container).`;
+        else servNote.textContent = "";
+      }
+    };
+
+    slider.addEventListener("input", update);
+    update();
+  }
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
   const rid = getRidFromUrl();
   if (!rid) {
-    setLoadingUI(false, "");
-    renderCallouts([{ tone: "info", title: "No report ID", body: "Open a report link that includes ?rid=RID_..." }], "callouts");
+    setStatus("");
+    renderCallouts([{ tone: "info", title: "No report ID", body: "Open a link like ?rid=RID_..." }], "callouts");
     return;
   }
 
   try {
-    await loadReport(rid);
+    setStatus("Loading...");
+    const url = `${WEBAPP}?action=get&rid=${encodeURIComponent(rid)}`;
+    const json = await fetchJsonWithTimeout(url, 20000);
+    if (!json.ok) throw new Error(json.error || "Backend returned ok:false");
+    hydrateReport(json.data || json);
+    setStatus("");
   } catch (e) {
-    setLoadingUI(false, "");
+    setStatus("");
     const msg =
-      (e && e.name === "AbortError") ? "Timed out talking to the backend (20s). This is usually CORS or the web app URL is wrong/not deployed." :
+      (e && e.name === "AbortError") ? "Timed out (20s) talking to the backend." :
       (e && e.message) ? e.message :
       String(e);
-
     renderCallouts([{ tone: "error", title: "Report failed to load", body: msg }], "callouts");
   }
 });
